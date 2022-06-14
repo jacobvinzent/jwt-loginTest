@@ -1,0 +1,289 @@
+<head>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"
+        integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta http-equiv="cleartype" content="on">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- Latest compiled JavaScript -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+        integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-Piv4xVNRyMGpqkS2by6br4gNJ7DXjqk09RmUpJ8jgGtD7zP9yug3goQfGII0yAns"
+        crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="css/page.css">
+    <script>
+        const genRand = (len, chars) => {
+            var result = '';
+            for (var i = len; i > 0; --i) result += chars[Math.floor(Math.random() * chars.length)];
+            return result;
+
+        };
+
+        $(document).ready(function () {
+            $('#jti').val(genRand(32, '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'));
+        });
+
+        function showHideClientID() {
+            //if ($('#secrets').css("opacity")== 0) {
+            if ($('#secrets').css("display") == 'none') {
+                //$('#secrets').css('opacity', '1');
+                $('#secrets').css("display", 'block')
+            } else {
+                //$('#secrets').css('opacity', '0');
+                $('#secrets').css("display", 'none')
+            }
+        }
+
+        function sendValues() {
+            var instance = $('#instance').val();
+            var sub = $('#sub').val();
+            var name = $('#name').val();
+            var email = $('#email').val();
+            var issuer = $('#issuer').val();
+            var keyid = $('#keyid').val();
+            var key = $('#key').val();
+            var jti = $('#jti').val();
+            var clientSecret = $('#clientSecret').val();
+            var clientID = $('#clientID').val();
+            var isAdmin = $('#isAdmin').is(':checked');
+
+
+            var jsonInput = {
+                "instance": instance,
+                "sub": sub,
+                "name": name,
+                "email": email,
+                "issuer": issuer,
+                "keyid": keyid,
+                "key": key,
+                "jti": jti,
+                "clientID": clientID,
+                "clientSecret": clientSecret
+
+            }
+
+
+            $.post("/getJWT", jsonInput)
+                .done(function (data) {
+                    var integrationID = $('#integrationID').val();
+
+                    var raw = "";
+                    var myHeaders = new Headers();
+                    myHeaders.append("qlik-web-integration-id", integrationID);
+                    myHeaders.append("content-type", "application/json");
+                    myHeaders.append("Authorization", "Bearer " + data);
+
+                    var requestOptions = {
+                        method: 'POST',
+                        headers: myHeaders,
+                        body: raw,
+                        credentials: "include",
+                        mode: "cors",
+                        rejectunAuthorized: false
+                    };
+                    fetch(instance + "/login/jwt-session?qlik-web-integration-id=" + integrationID, requestOptions)
+                        .then(response => response.text())
+                        .then(result => {
+                            console.log(result);
+                            if (!isAdmin) {
+                                window.location.replace(instance);
+                            } else {
+                                setAdmin(data, integrationID, email, instance, clientID, clientSecret);
+                            }
+                        })
+                        .catch(error => {
+
+                            console.log('error', error)
+                        });
+
+
+                });
+
+
+        }
+
+        function setAdmin(data, integrationID, email, instance, clientID, clientSecret) {
+            var jsonInput = {};
+            jsonInput.token = data;
+            jsonInput.email = email;
+            jsonInput.instance = instance;
+            jsonInput.clientID = clientID;
+            jsonInput.clientSecret = clientSecret;
+
+            $.post("/makeAdmin", jsonInput)
+                .done(function (data) {
+                    var integrationID = $('#integrationID').val();
+
+                    var raw = "";
+                    var myHeaders = new Headers();
+                    myHeaders.append("qlik-web-integration-id", integrationID);
+                    myHeaders.append("content-type", "application/json");
+                    myHeaders.append("Authorization", "Bearer " + data);
+
+
+
+                    var requestOptions = {
+                        method: 'POST',
+                        headers: myHeaders,
+                        body: raw,
+                        credentials: "include",
+                        mode: "cors",
+                        rejectunAuthorized: false
+                    };
+                    fetch(instance + "/login/jwt-session?qlik-web-integration-id=" + integrationID, requestOptions)
+                        .then(response => response.text())
+                        .then(result => {
+                            console.log(result);
+                            window.location.replace(instance);
+                        })
+                        .catch(error => {
+
+                            console.log('error', error)
+                        });
+
+
+                });
+        }
+
+
+        function getDefaultValues() {
+
+            $.getJSON("/getDefaultValues", function (data) {
+
+                console.log(data.instance);
+                if (data.default_instanceURL) {
+                    $('#instance').val(data.default_instanceURL)
+                }
+                if (data.sub) {
+                    $('#sub').val(data.sub)
+                }
+
+                if (data.name) {
+                    $('#name').val(data.name);
+                }
+
+                if (data.email) {
+                    $('#email').val(data.email);
+                }
+
+                if (data.issuer) {
+                    $('#issuer').val(data.issuer);
+                }
+
+                if (data.keyid) {
+                    $('#keyid').val(data.keyid);
+                }
+
+                if (data.key) {
+                    $('#key').val(data.key);
+                }
+
+                if (data.integrationID) {
+                    $('#integrationID').val(data.integrationID);
+                }
+
+                if (data.clientID) {
+                    $('#clientID').val(data.clientID);
+                }
+
+                if (data.clientSecret) {
+                    $('#clientSecret').val(data.clientSecret);
+                }
+
+
+            })
+        }
+
+        getDefaultValues();
+
+
+    </script>
+</head>
+
+<body>
+
+    <div style="width:1200; padding-left: 25%; padding-top: 3%;">
+        <div class="rendered-form">
+            <div class="formbuilder-text form-group field-instance">
+                <label for="instance" class="formbuilder-text-label">Instance URL<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" placeholder="https://xxxyyyy.eu.qlikcloud.com" class="form-control" name="instance"
+                    access="false" id="instance" required="required" aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-APIToken">
+                <label for="APIToken" class="formbuilder-text-label">jti<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="jti" access="false" id="jti" required="required"
+                    aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-APIToken">
+                <label for="APIToken" class="formbuilder-text-label">Sub<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="sub" access="false" id="sub" required="required"
+                    aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-instance">
+                <label for="instance" class="formbuilder-text-label">Name<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" placeholder="John Doe" class="form-control" name="name" access="false" id="name"
+                    required="required" aria-required="true">
+            </div>
+
+            <div class="formbuilder-text form-group field-APIToken">
+                <label for="APIToken" class="formbuilder-text-label">Email<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="email" access="false" id="email" required="required"
+                    aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-jwt">
+                <label for="jwt" class="formbuilder-text-label">Issuer<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="issuer" access="false" value="myissuer" id="issuer"
+                    required="required" aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-templateID">
+                <label for="templateID" class="formbuilder-text-label">KeyId<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="keyid" access="false" id="keyid" required="required"
+                    value="mykeyid" aria-required="true">
+            </div>
+            <div class="formbuilder-text form-group field-APIToken">
+                <label for="APIToken" class="formbuilder-text-label">qlik-web-integration-id<span
+                        class="formbuilder-required">*</span></label>
+                <input type="text" class="form-control" name="integrationID" access="false" id="integrationID"
+                    required="required" aria-required="true">
+            </div>
+            <div class="formbuilder-textarea form-group field-key">
+                <label for="key" class="formbuilder-textarea-label">Private key for JWT signing<span
+                        class="formbuilder-required">*</span></label>
+                <textarea type="textarea" class="form-control" name="key" access="false" id="key" required="required"
+                    aria-required="true"></textarea>
+            </div>
+            <div class="formbuilder-textarea form-group field-key">
+                <label for="key" class="formbuilder-textarea-label">Make tenant Admin (only for partner accounts)<span
+                        class="formbuilder-required">*</span></label>
+                <input type="checkbox" id="isAdmin" name="isAdmin" value="isAdmin" onclick="showHideClientID()">
+            </div>
+            <span id="secrets" style="display: none;">
+                <div class="formbuilder-textarea form-group field-key">
+                    <label for="key" class="formbuilder-textarea-label">ClientID<span
+                            class="formbuilder-required">*</span></label>
+                    <input type="text" class="form-control" name="clientID" access="false" id="clientID"
+                        required="required" aria-required="true">
+                </div>
+                <div class="formbuilder-textarea form-group field-key">
+                    <label for="key" class="formbuilder-textarea-label">Client secret<span
+                            class="formbuilder-required">*</span></label>
+                    <input type="text" class="form-control" name="clientSecret" access="false" id="clientSecret"
+                        required="required" aria-required="true">
+                </div>
+            </span>
+            <div class="formbuilder-button form-group field-button-1629187719298">
+                <button type="button" class="btn-success btn" name="button-1629187719298" access="false" style="success"
+                    id="button-1629187719298" onClick="sendValues()">Login</button>
+            </div>
+        </div>
+    </div>
+
+</body>
